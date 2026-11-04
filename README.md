@@ -22,7 +22,7 @@ Você digita ──► Claude Code ──► proxy local ToToken ──► API d
 
 ## Instalação
 
-Precisa de Node.js 18+, git e Claude Code. Não há dependências. Um comando instala tudo:
+Precisa de Node.js 18+ e Claude Code (no Mac/Linux, também git). Não há dependências. Um comando instala tudo:
 
 **macOS / Linux**
 ```
@@ -33,6 +33,7 @@ curl -fsSL https://raw.githubusercontent.com/Nichlekakis/ToToken-Translator/main
 ```
 irm https://raw.githubusercontent.com/Nichlekakis/ToToken-Translator/main/install.ps1 | iex
 ```
+No Windows o instalador não precisa de git, e instala o Node.js pelo winget se ele faltar. Se der erro, a mensagem aparece na própria janela.
 
 O instalador baixa o projeto em `~/.totoken/app`, liga o proxy, registra o plugin no Claude Code e aponta o Claude Code para o proxy. Depois é só abrir o Claude Code normalmente. Rodar o mesmo comando de novo atualiza.
 

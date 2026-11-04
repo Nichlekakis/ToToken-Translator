@@ -55,7 +55,7 @@ async function startDaemon(cfg, quiet = false) {
   }
   ensureHome();
   const out = fs.openSync(logFile(), 'a');
-  const child = spawn(process.execPath, [SELF, 'serve'], { detached: true, stdio: ['ignore', out, out], env: process.env });
+  const child = spawn(process.execPath, [SELF, 'serve'], { detached: true, windowsHide: true, stdio: ['ignore', out, out], env: process.env });
   child.unref();
   fs.writeFileSync(pidFile(), String(child.pid));
   for (let i = 0; i < 30; i++) {
