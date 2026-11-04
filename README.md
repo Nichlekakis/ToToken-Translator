@@ -47,6 +47,11 @@ Depois de instalado, não há nada a fazer: todo prompt é comprimido sozinho.
 | `/totoken:preview <texto>` | Mostra como um texto seria comprimido |
 | `/totoken:mode auto\|local\|off` | `auto`: regras + Haiku. `local`: só regras, custo zero. `off`: desliga |
 | `!raw <prompt>` | Envia aquele prompt sem compressão |
+| skill `totoken` | Comprime um texto sob pedido ("comprima este prompt") ou liga o modo econômico ("modo totoken") |
+
+### Skill (também no app do Claude)
+
+`skills/totoken/SKILL.md` vem junto com o plugin e também pode ser usada sozinha no claude.ai, onde o proxy não roda. Ela faz duas coisas: comprime um texto que você mandar, seguindo as mesmas etapas do proxy (proteger, cortar, traduzir, estruturar, conferir), e liga um modo econômico em que o Claude trabalha a partir de uma especificação curta do pedido, pergunta antes de adivinhar e responde sem rodeios. A skill não consegue encolher o texto antes do envio; isso é trabalho do proxy.
 
 No terminal: `totoken status`, `totoken start`, `totoken stop`, `totoken stats`, `totoken preview "texto"`, `totoken bench bench/prompts-pt.txt [--api] [--show]`.
 
@@ -78,6 +83,6 @@ npm test          # 20 testes, incluindo proxy de ponta a ponta com API simulada
 npm run bench     # benchmark offline
 ```
 
-Estrutura: `src/protect.js` (marcadores), `src/deterministic.js` (regras locais), `src/rewriter.js` (Haiku), `src/compressor.js` (orquestra e cacheia), `src/transform.js` (corpo da requisição), `src/proxy.js` (servidor), `bin/totoken.js` (CLI), `hooks/` e `commands/` (plugin).
+Estrutura: `src/protect.js` (marcadores), `src/deterministic.js` (regras locais), `src/rewriter.js` (Haiku), `src/compressor.js` (orquestra e cacheia), `src/transform.js` (corpo da requisição), `src/proxy.js` (servidor), `bin/totoken.js` (CLI), `hooks/`, `commands/` e `skills/` (plugin).
 
 A reescrita usa HTTP direto em vez do SDK de propósito: o proxy reaproveita as credenciais exatas da requisição interceptada e o plugin roda sem `npm install`.
