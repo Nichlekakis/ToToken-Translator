@@ -22,18 +22,23 @@ Você digita ──► Claude Code ──► proxy local ToToken ──► API d
 
 ## Instalação
 
-Precisa de Node.js 18 ou mais novo. Não há dependências.
+Precisa de Node.js 18+, git e Claude Code. Não há dependências. Um comando instala tudo:
 
-1. No Claude Code, adicione o plugin:
-   ```
-   /plugin marketplace add Nichlekakis/ToToken-Translator
-   /plugin install totoken@totoken-translator
-   ```
-2. Aponte o Claude Code para o proxy, de um destes jeitos:
-   - **Automático em toda sessão:** `npx github:Nichlekakis/ToToken-Translator install` (ou `node bin/totoken.js install` num clone). Isso grava `ANTHROPIC_BASE_URL=http://127.0.0.1:8787` em `~/.claude/settings.json`, e o hook do plugin liga o proxy no início de cada sessão.
-   - **Só quando quiser:** `node bin/totoken.js run` abre o Claude Code já passando pelo proxy.
+**macOS / Linux**
+```
+curl -fsSL https://raw.githubusercontent.com/Nichlekakis/ToToken-Translator/main/install.sh | sh
+```
 
-Para desfazer: `node bin/totoken.js uninstall`.
+**Windows (PowerShell)**
+```
+irm https://raw.githubusercontent.com/Nichlekakis/ToToken-Translator/main/install.ps1 | iex
+```
+
+O instalador baixa o projeto em `~/.totoken/app`, liga o proxy, registra o plugin no Claude Code e aponta o Claude Code para o proxy. Depois é só abrir o Claude Code normalmente. Rodar o mesmo comando de novo atualiza.
+
+Para desfazer tudo: `node ~/.totoken/app/bin/totoken.js remove`.
+
+O Claude Code só é apontado para o proxy se o plugin for registrado, porque é o hook do plugin que religa o proxy em cada sessão (por exemplo, depois de reiniciar o computador). Se o registro falhar, use `node ~/.totoken/app/bin/totoken.js run` para abrir o Claude Code pelo proxy.
 
 Funciona com chave de API e com login de assinatura do Claude Code: a reescrita usa as mesmas credenciais da requisição original.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,6 +11,7 @@ import { RewriteCache, readStats } from '../src/store.js';
 import { estimateTokens } from '../src/tokens.js';
 
 const SELF = fileURLToPath(import.meta.url);
+const ROOT = path.resolve(path.dirname(SELF), '..');
 const pidFile = () => path.join(homeDir(), 'proxy.pid');
 const logFile = () => path.join(homeDir(), 'proxy.log');
 const baseUrl = (cfg) => `http://127.0.0.1:${cfg.port}`;
@@ -27,7 +28,9 @@ Uso: totoken <comando>
   bench <arquivo>    Mede a economia em prompts separados por linhas "---" (--api: contagem exata)
   stats              Economia acumulada
   mode <auto|local|off>  Troca o modo de compressão
-  install | uninstall    Grava ou remove ANTHROPIC_BASE_URL em ~/.claude/settings.json
+  setup              Instala tudo: liga o proxy, aponta o Claude Code para ele e registra o plugin
+  remove             Desfaz o setup: tira o plugin, o ANTHROPIC_BASE_URL e para o proxy
+  install | uninstall    Só grava ou remove ANTHROPIC_BASE_URL em ~/.claude/settings.json
   serve              Roda o proxy em primeiro plano
 
 Modos: auto = regras locais + reescrita com ${loadConfig().rewriterModel}; local = só regras locais (custo zero); off = passa direto.
@@ -199,6 +202,47 @@ function install(cfg, remove = false) {
   console.log(remove ? 'ANTHROPIC_BASE_URL removido.' : `Claude Code agora usa ${baseUrl(cfg)}. O hook do plugin liga o proxy em cada sessão.`);
 }
 
+function claudeCli(args) {
+  const r = spawnSync('claude', args, { stdio: 'inherit', shell: process.platform === 'win32' });
+  return r.status === 0;
+}
+
+function hasClaudeCli() {
+  const r = spawnSync('claude', ['--version'], { stdio: 'ignore', shell: process.platform === 'win32' });
+  return r.status === 0;
+}
+
+async function setup(cfg) {
+  console.log('1/3 Ligando o proxy...');
+  if (!(await startDaemon(cfg))) process.exit(1);
+  console.log('2/3 Registrando o plugin no Claude Code...');
+  let plugin = false;
+  if (hasClaudeCli()) {
+    claudeCli(['plugin', 'marketplace', 'add', ROOT]);
+    plugin = claudeCli(['plugin', 'install', 'totoken@totoken-translator']);
+  }
+  if (!plugin) {
+    // Without the plugin's SessionStart hook nobody restarts the proxy, so do not
+    // point Claude Code at it permanently: that would break Claude Code after a reboot.
+    console.log(`Não consegui registrar o plugin. Use "node ${SELF} run" para abrir o Claude Code pelo proxy.`);
+    return;
+  }
+  console.log('3/3 Apontando o Claude Code para o proxy...');
+  install(cfg);
+  console.log('\nPronto. Abra o Claude Code normalmente: todo prompt passa pelo ToToken.');
+  console.log(`Economia: node ${SELF} stats · desfazer: node ${SELF} remove`);
+}
+
+async function removeAll(cfg) {
+  install(cfg, true);
+  if (hasClaudeCli()) {
+    claudeCli(['plugin', 'uninstall', 'totoken@totoken-translator']);
+    claudeCli(['plugin', 'marketplace', 'remove', 'totoken-translator']);
+  }
+  stopDaemon();
+  console.log('ToToken removido. O Claude Code volta a falar direto com a API.');
+}
+
 async function run(cfg, args) {
   if (!(await startDaemon(cfg, true))) process.exit(1);
   const dash = args.indexOf('--');
@@ -231,6 +275,8 @@ async function main() {
       console.log(`Modo: ${args[0]}. Reinicie o proxy (totoken stop && totoken start) para aplicar.`);
       return;
     }
+    case 'setup': return setup(cfg);
+    case 'remove': return removeAll(cfg);
     case 'install': return install(cfg);
     case 'uninstall': return install(cfg, true);
     case 'cache-clear': {
