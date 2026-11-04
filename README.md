@@ -59,6 +59,8 @@ Depois de instalado, não há nada a fazer: todo prompt é comprimido sozinho.
 
 `skills/totoken/SKILL.md` vem junto com o plugin e também pode ser usada sozinha no claude.ai, onde o proxy não roda. Ela faz duas coisas: comprime um texto que você mandar, seguindo as mesmas etapas do proxy (proteger, cortar, traduzir, estruturar, conferir), e liga um modo econômico em que o Claude trabalha a partir de uma especificação curta do pedido, pergunta antes de adivinhar e responde sem rodeios. A skill não consegue encolher o texto antes do envio; isso é trabalho do proxy.
 
+Para testar rápido, sem conversar à mão: `node ~/.totoken/app/bin/totoken.js simulate` manda uma conversa de 4 mensagens ao Claude pelo proxy (usando o seu login do Claude Code) e mostra, para cada mensagem, o que você escreveu, o que foi enviado, a economia e o custo. Com `--compare`, repete a mesma conversa sem compressão e compara custo e tokens de entrada. Com `--file prompts.txt`, usa os seus prompts (separados por linhas `---`). A simulação roda numa pasta própria em `~/.totoken/sim` e não usa ferramentas.
+
 No terminal: `totoken status`, `totoken start`, `totoken stop`, `totoken stats`, `totoken preview "texto"`, `totoken bench bench/prompts-pt.txt [--api] [--show]`.
 
 Configuração em `~/.totoken/config.json` (ou variáveis `TOTOKEN_*`):

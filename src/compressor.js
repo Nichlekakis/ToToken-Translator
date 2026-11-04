@@ -69,7 +69,7 @@ async function compressFresh(text, key, { config, cache, headers = null, fetchIm
 
   cache?.set(key, out);
   if (record) {
-    recordStat({ method, lang, before, after, ms: Date.now() - started, ...(failure ? { failure } : {}) });
+    recordStat({ method, lang, before, after, ms: Date.now() - started, sample: out.slice(0, 400), orig: text.slice(0, 80), ...(failure ? { failure } : {}) });
   }
   return { text: out, method, lang, before, after, failure };
 }
