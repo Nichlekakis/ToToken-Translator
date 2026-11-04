@@ -1,0 +1,13 @@
+{
+  "name": "totoken-translator",
+  "owner": {
+    "name": "Nicholas"
+  },
+  "plugins": [
+    {
+      "name": "totoken",
+      "source": "./",
+      "description": "Compressão automática de prompts para economizar tokens e aumentar a precisão."
+    }
+  ]
+}

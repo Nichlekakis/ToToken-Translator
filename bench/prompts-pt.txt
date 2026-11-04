@@ -1,0 +1,15 @@
+Olá Claude, tudo bem? Você poderia por favor me ajudar a criar uma função chamada parse_config no arquivo src/config.js que leia o "settings.json" e valide os campos obrigatórios? Basicamente eu queria que você não usasse dependências externas. Obrigado desde já!
+---
+Oi! Então, eu estou com um problema no meu projeto. Quando eu rodo `npm test` aparecem 3 testes falhando no arquivo test/api.test.js. Você consegue dar uma olhada e me dizer o que está acontecendo? Na verdade eu acho que é algo com o mock do banco de dados, mas não tenho certeza, sabe? Por favor não mude os testes, só o código.
+---
+Por favor, revise o arquivo src/server.js e encontre por que a função handleRequest() às vezes retorna 500 quando o corpo da requisição está vazio. Explique a causa e proponha uma correção mínima, sem mudar a API pública. Se possível, adicione um teste que reproduza o problema.
+---
+Eu gostaria que você escrevesse um README em português para este projeto, explicando o que ele faz, como instalar, como rodar os testes e como contribuir. Use uma linguagem simples, por favor, porque o público não é técnico. Não precisa colocar badges.
+---
+Bom dia! Preciso que você refatore o componente UserProfile para usar hooks em vez de classe. Mantenha o mesmo comportamento, mantenha o mesmo comportamento, e não quebre os testes existentes. Valeu!
+---
+Você pode me explicar a diferença entre prompt caching e batch na API do Claude, e quando vale a pena usar cada um? Basicamente eu quero reduzir custo num sistema que processa uns 10 mil documentos por dia.
+---
+Rode os testes.
+---
+Hi there! Could you please help me add retry logic with exponential backoff to the fetchData() function in lib/http.ts? I'd like it to retry at most 3 times and only on 5xx errors. Thanks in advance!
