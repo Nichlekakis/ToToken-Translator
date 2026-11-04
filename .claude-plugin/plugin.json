@@ -1,0 +1,11 @@
+{
+  "name": "totoken",
+  "version": "0.1.0",
+  "description": "Comprime automaticamente cada prompt (regras locais + reescrita em inglês técnico com Haiku) antes de chegar ao modelo: menos tokens, instruções mais precisas.",
+  "author": {
+    "name": "Nicholas"
+  },
+  "repository": "https://github.com/Nichlekakis/ToToken-Translator",
+  "license": "MIT",
+  "keywords": ["tokens", "compression", "cost", "prompt", "translation"]
+}
