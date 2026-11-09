@@ -3,8 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ensureHome, homeDir } from './config.js';
 
-// Persistent original -> compressed map. It keeps rewrites deterministic across
-// turns, so the conversation prefix stays byte-identical and prompt caching works.
+// Prompts may be sensitive: files that hold them are readable by the owner only.
+const PRIVATE = { mode: 0o600 };
+const MAX_STATS_BYTES = 4 * 1024 * 1024;
+
+// Persistent original -> sent map. It makes rewrites repeatable across turns and
+// restarts, so the conversation prefix stays byte-identical and prompt caching works.
 export class RewriteCache {
   constructor({ file, maxEntries = 5000, persist = true } = {}) {
     this.file = file || path.join(homeDir(), 'cache.json');
@@ -22,12 +26,19 @@ export class RewriteCache {
     }
   }
 
-  static key(text, salt = '') {
-    return crypto.createHash('sha256').update(salt).update('\0').update(text).digest('hex').slice(0, 32);
+  // The key depends only on the text: settings must not change how history is found.
+  static key(text) {
+    return crypto.createHash('sha256').update(text).digest('hex').slice(0, 32);
   }
 
+  // A read refreshes the entry, so messages of a live conversation are evicted last.
   get(key) {
-    return this.map.get(key);
+    const value = this.map.get(key);
+    if (value !== undefined && this.map.size > this.maxEntries / 2) {
+      this.map.delete(key);
+      this.map.set(key, value);
+    }
+    return value;
   }
 
   set(key, value) {
@@ -48,10 +59,14 @@ export class RewriteCache {
 
   flush() {
     if (!this.persist) return;
-    ensureHome();
-    const tmp = this.file + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify([...this.map]));
-    fs.renameSync(tmp, this.file);
+    try {
+      ensureHome();
+      const tmp = `${this.file}.${process.pid}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify([...this.map]), PRIVATE);
+      fs.renameSync(tmp, this.file);
+    } catch {
+      // the cache is best-effort; the in-memory copy still serves this run
+    }
   }
 }
 
@@ -62,7 +77,13 @@ export function statsFile() {
 export function recordStat(entry) {
   try {
     ensureHome();
-    fs.appendFileSync(statsFile(), JSON.stringify({ ts: new Date().toISOString(), ...entry }) + '\n');
+    const file = statsFile();
+    try {
+      if (fs.statSync(file).size > MAX_STATS_BYTES) fs.renameSync(file, `${file}.old`);
+    } catch {
+      // no stats file yet
+    }
+    fs.appendFileSync(file, JSON.stringify({ ts: new Date().toISOString(), ...entry }) + '\n', PRIVATE);
   } catch {
     // stats are best-effort
   }

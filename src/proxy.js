@@ -1,6 +1,7 @@
 import http from 'node:http';
 import https from 'node:https';
 import { VERSION } from './config.js';
+import { rewriterState } from './rewriter.js';
 import { RewriteCache } from './store.js';
 import { transformBody } from './transform.js';
 
@@ -24,6 +25,7 @@ function forward(req, res, upstream, body, log) {
   for (const [k, v] of Object.entries(req.headers)) if (!HOP_BY_HOP.has(k)) headers[k] = v;
   headers.host = target.host;
   if (body) headers['content-length'] = Buffer.byteLength(body);
+  else if (req.headers['content-length']) headers['content-length'] = req.headers['content-length'];
   const lib = target.protocol === 'http:' ? http : https;
   const up = lib.request(target, { method: req.method, headers }, (upRes) => {
     const outHeaders = {};
@@ -47,17 +49,22 @@ function forward(req, res, upstream, body, log) {
   else req.pipe(up);
 }
 
-export function createProxy({ config, cache = new RewriteCache({ maxEntries: config.maxCacheEntries }), fetchImpl, log = () => {} }) {
-  const server = http.createServer(async (req, res) => {
+// `config` is a plain object, or a function returning the current one (live reload).
+export function createProxy({ config, cache, fetchImpl, log = () => {} }) {
+  const getConfig = typeof config === 'function' ? config : () => config;
+  cache = cache || new RewriteCache({ maxEntries: getConfig().maxCacheEntries });
+
+  const handle = async (req, res) => {
+    const cfg = getConfig();
     const pathname = (req.url || '').split('?')[0];
     if (pathname === '/__totoken/health') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, version: VERSION, mode: config.mode }));
+      res.end(JSON.stringify({ ok: true, version: VERSION, mode: cfg.mode, pid: process.pid, rewriter: rewriterState() }));
       return;
     }
     const isMessages = req.method === 'POST' && (pathname === '/v1/messages' || pathname === '/v1/messages/count_tokens');
-    if (!isMessages || config.mode === 'off') {
-      forward(req, res, config.upstream, null, log);
+    if (!isMessages) {
+      forward(req, res, cfg.upstream, null, log);
       return;
     }
     let raw;
@@ -71,12 +78,13 @@ export function createProxy({ config, cache = new RewriteCache({ maxEntries: con
     try {
       const body = JSON.parse(raw.toString('utf8'));
       const { changed, results } = await transformBody(body, {
-        config,
+        config: cfg,
         cache,
         headers: req.headers,
         fetchImpl,
-        // count_tokens must not trigger paid rewrites; it reuses cached ones
-        compressNew: pathname === '/v1/messages',
+        // count_tokens must not trigger paid rewrites; it reuses what was already sent.
+        // Mode "off" still replays history, so turning it off does not break prompt caching.
+        compressNew: pathname === '/v1/messages' && cfg.mode !== 'off',
       });
       if (changed) out = Buffer.from(JSON.stringify(body));
       for (const r of results) {
@@ -86,8 +94,17 @@ export function createProxy({ config, cache = new RewriteCache({ maxEntries: con
       log(`transform skipped: ${err.message}`); // never block a request
       out = raw;
     }
-    forward(req, res, config.upstream, out, log);
+    forward(req, res, cfg.upstream, out, log);
+  };
+
+  const server = http.createServer((req, res) => {
+    handle(req, res).catch((err) => {
+      log(`request failed: ${err.message}`);
+      if (!res.headersSent) res.writeHead(502, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ type: 'error', error: { type: 'api_error', message: `ToToken proxy: ${err.message}` } }));
+    });
   });
+  server.on('clientError', (err, socket) => socket.destroy());
   server.cache = cache;
   return server;
 }

@@ -13,7 +13,7 @@ When the user hands you a prompt or text to optimize, return the compressed vers
 
 Steps:
 1. **Protect.** Copy byte for byte: code blocks, inline code, file paths, URLs, identifiers (`parse_config`, `getUser()`), CLI flags, numbers, quoted text and XML-like tags.
-2. **Cut.** Drop greetings, thanks, politeness ("por favor", "você poderia"), hedging, filler ("basicamente", "na verdade") and repeated sentences.
+2. **Cut.** Drop greetings, thanks, politeness ("por favor", "você poderia"), hedging, filler ("basicamente", "na verdade") and repeated sentences. Keep words that carry meaning even when they look like politeness: conditions ("se possível", "only if"), permissions ("você pode usar X") and doubts the user states ("acho que é o mock").
 3. **Translate.** Write the rest in concise technical English: it uses fewer tokens than Portuguese and models follow it at least as well. If the user wants the answer in Portuguese, end with `Reply in Brazilian Portuguese.` Skip translation if the user asks to keep the language.
 4. **Structure.** For a multi-part request, use only the labels that apply, one per line: `Goal:`, `Context:`, `Constraints:`, `Output:`. A short request stays one plain sentence.
 5. **Check.** Every requirement, negation, number and name from the original is still there, nothing was added, and the result is shorter. If it is not shorter, return the original.
