@@ -71,6 +71,7 @@ function tidy(s) {
     .replace(/,\s*([.!?])(?=\s|$)/g, '$1')
     .replace(/^[\s,;:]+/, '')
     .replace(/^[.!?]+(?=\s|$)\s*/, '')
+    .replace(/[\s,;]+$/, '')
     .trim();
 }
 
