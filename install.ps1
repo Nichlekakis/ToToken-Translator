@@ -3,6 +3,7 @@
 # Roda dentro da janela do usuário via iex: nunca use `exit` aqui, porque fecharia a janela.
 
 function Install-ToToken {
+  $ErrorActionPreference = 'Stop'
   $branch = if ($env:TOTOKEN_BRANCH) { $env:TOTOKEN_BRANCH } else { 'main' }
   $root = if ($env:TOTOKEN_HOME) { $env:TOTOKEN_HOME } else { Join-Path $HOME '.totoken' }
   $dir = Join-Path $root 'app'
@@ -29,11 +30,16 @@ function Install-ToToken {
   Expand-Archive -Path $zip -DestinationPath $tmp -Force
   $src = Get-ChildItem $tmp -Directory | Select-Object -First 1
   New-Item -ItemType Directory -Force -Path $root | Out-Null
+  # Coloca a versão nova ao lado da antiga e só então troca: se algo falhar no
+  # meio, a instalação que já funcionava continua no lugar.
+  $new = Join-Path $root 'app.new'
+  if (Test-Path $new) { Remove-Item -Recurse -Force $new }
+  Move-Item $src.FullName $new
   if (Test-Path $dir) {
     & node (Join-Path $dir 'bin/totoken.js') stop | Out-Null
     Remove-Item -Recurse -Force $dir
   }
-  Move-Item $src.FullName $dir
+  Move-Item $new $dir
   Remove-Item -Force $zip
   Remove-Item -Recurse -Force $tmp
 

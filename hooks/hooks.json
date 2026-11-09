@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/totoken.js\" ensure --quiet",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/totoken.js\" hook",
             "timeout": 10
           }
         ]

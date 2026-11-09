@@ -9,12 +9,18 @@ const REPLY_HINT = {
   pt: 'Reply in Brazilian Portuguese.',
 };
 
-export const RAW_PREFIX = '!raw';
+// "raw: <prompt>" sends a prompt untouched. "!raw" is the older spelling; it still
+// works, but Claude Code's own input box treats a leading "!" as a shell command.
+export const RAW_PREFIX = 'raw:';
+const RAW_RE = /^\s*(?:raw:|!raw)\s+/i;
 
 function stripRaw(text) {
-  const t = text.trimStart();
-  return t.startsWith(RAW_PREFIX) ? t.slice(RAW_PREFIX.length).trimStart() : null;
+  const m = text.match(RAW_RE);
+  return m ? text.slice(m[0].length) : null;
 }
+
+// The user already said which language they want the answer or the output in.
+const LANGUAGE_REQUEST = /\b(?:em|in)\s+(?:ingl[êe]s|english|portugu[êe]s|portuguese|espanhol|spanish)\b|\b(?:respond[ae]|reply|answer)\s+(?:em|in)\b/i;
 
 // Cache marker for "sent unchanged": avoids storing the text twice.
 const SAME = 0;
@@ -50,8 +56,9 @@ export async function compressText(text, opts) {
     .catch(() => ({ text, method: 'none', failure: 'internal' }))
     .then((r) => {
       // Remember the decision even when nothing changed, so a retry of the same
-      // request cannot produce a different text.
-      cache?.set(key, r.text === text ? SAME : r.text);
+      // request cannot produce a different text. Decisions that depend only on
+      // the text itself need no entry.
+      if (!r.fixed) cache?.set(key, r.text === text ? SAME : r.text);
       return r;
     })
     .finally(() => inflight.delete(key));
@@ -73,10 +80,10 @@ function llmGate(candidate, lang, { config, headers, model }) {
 async function compressFresh(text, opts) {
   const { config, headers = null, fetchImpl, record = true } = opts;
   const started = Date.now();
-  if (text.length > config.maxChars || !canMask(text)) return { text, method: 'none' };
+  if (text.length > config.maxChars || !canMask(text)) return { text, method: 'none', fixed: true };
 
   const { masked, pieces } = mask(text);
-  if (freeTextLength(masked) < 12) return { text, method: 'none' };
+  if (freeTextLength(masked) < 12) return { text, method: 'none', fixed: true };
   const lang = detectLanguage(stripPlaceholders(masked));
   let candidate = deterministicCompress(masked);
   if (!placeholdersIntact(candidate, pieces.length)) candidate = masked;
@@ -91,7 +98,7 @@ async function compressFresh(text, opts) {
     if (r.ok) {
       candidate = r.text;
       method = 'llm';
-      if (translate && REPLY_HINT[lang]) candidate += `\n${REPLY_HINT[lang]}`;
+      if (translate && REPLY_HINT[lang] && !LANGUAGE_REQUEST.test(text)) candidate += `\n${REPLY_HINT[lang]}`;
     } else {
       failure = r.reason;
     }

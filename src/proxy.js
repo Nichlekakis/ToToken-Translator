@@ -4,6 +4,7 @@ import { VERSION } from './config.js';
 import { rewriterState } from './rewriter.js';
 import { RewriteCache } from './store.js';
 import { transformBody } from './transform.js';
+import { TypedPrompts } from './typed.js';
 
 const HOP_BY_HOP = new Set([
   'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
@@ -20,7 +21,8 @@ function readBody(req) {
 }
 
 function forward(req, res, upstream, body, log) {
-  const target = new URL(req.url, upstream);
+  // keep a path prefix of the upstream (https://gateway/anthropic + /v1/messages)
+  const target = new URL(upstream.replace(/\/$/, '') + req.url);
   const headers = {};
   for (const [k, v] of Object.entries(req.headers)) if (!HOP_BY_HOP.has(k)) headers[k] = v;
   headers.host = target.host;
@@ -53,13 +55,25 @@ function forward(req, res, upstream, body, log) {
 export function createProxy({ config, cache, fetchImpl, log = () => {} }) {
   const getConfig = typeof config === 'function' ? config : () => config;
   cache = cache || new RewriteCache({ maxEntries: getConfig().maxCacheEntries });
+  const typed = new TypedPrompts();
 
   const handle = async (req, res) => {
     const cfg = getConfig();
     const pathname = (req.url || '').split('?')[0];
     if (pathname === '/__totoken/health') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, version: VERSION, mode: cfg.mode, pid: process.pid, rewriter: rewriterState() }));
+      res.end(JSON.stringify({ ok: true, version: VERSION, mode: cfg.mode, pid: process.pid, hooked: typed.hooked, rewriter: rewriterState() }));
+      return;
+    }
+    if (pathname === '/__totoken/prompt' && req.method === 'POST') {
+      // the plugin's UserPromptSubmit hook reports what the user just typed
+      try {
+        typed.add(JSON.parse((await readBody(req)).toString('utf8')).prompt);
+      } catch {
+        // a malformed report is ignored
+      }
+      res.writeHead(204);
+      res.end();
       return;
     }
     const isMessages = req.method === 'POST' && (pathname === '/v1/messages' || pathname === '/v1/messages/count_tokens');
@@ -82,6 +96,7 @@ export function createProxy({ config, cache, fetchImpl, log = () => {} }) {
         cache,
         headers: req.headers,
         fetchImpl,
+        typed,
         // count_tokens must not trigger paid rewrites; it reuses what was already sent.
         // Mode "off" still replays history, so turning it off does not break prompt caching.
         compressNew: pathname === '/v1/messages' && cfg.mode !== 'off',
@@ -106,5 +121,6 @@ export function createProxy({ config, cache, fetchImpl, log = () => {} }) {
   });
   server.on('clientError', (err, socket) => socket.destroy());
   server.cache = cache;
+  server.typed = typed;
   return server;
 }

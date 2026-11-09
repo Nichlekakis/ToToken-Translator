@@ -15,7 +15,6 @@ export class RewriteCache {
     this.maxEntries = maxEntries;
     this.persist = persist;
     this.map = new Map();
-    this.timer = null;
     if (persist) {
       try {
         const data = JSON.parse(fs.readFileSync(this.file, 'utf8'));
@@ -45,16 +44,9 @@ export class RewriteCache {
     this.map.delete(key);
     this.map.set(key, value);
     while (this.map.size > this.maxEntries) this.map.delete(this.map.keys().next().value);
-    this.scheduleSave();
-  }
-
-  scheduleSave() {
-    if (!this.persist || this.timer) return;
-    this.timer = setTimeout(() => {
-      this.timer = null;
-      this.flush();
-    }, 500);
-    this.timer.unref?.();
+    // Written before the request is forwarded: if the proxy dies right after, the
+    // next one must still know what was sent (Windows gives no shutdown signal).
+    this.flush();
   }
 
   flush() {

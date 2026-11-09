@@ -22,8 +22,11 @@ export function hasClaudeCli() {
   return spawnSync('claude', ['--version'], { stdio: 'ignore', shell: SHELL }).status === 0;
 }
 
+// With a shell (Windows), an argument holding spaces must be quoted by us.
+const shellArg = (a) => (SHELL && /\s/.test(a) ? `"${a}"` : a);
+
 export function claudeCli(args) {
-  return spawnSync('claude', args, { stdio: 'inherit', shell: SHELL }).status === 0;
+  return spawnSync('claude', args.map(shellArg), { stdio: 'inherit', shell: SHELL }).status === 0;
 }
 
 // Runs one scripted conversation through `claude -p`, so it uses the user's own
@@ -96,7 +99,7 @@ export async function simulate(cfg, args) {
     console.log('\nRepetindo a mesma conversa sem o ToToken para comparar...');
     const directDir = path.join(base, 'direct');
     fs.mkdirSync(directDir, { recursive: true });
-    // "!raw" makes the proxy pass each prompt untouched; this works even when
+    // "raw:" makes the proxy pass each prompt untouched; this works even when
     // settings.json pins Claude Code to the proxy.
     const direct = runConversation(prompts.map((p) => `${RAW_PREFIX} ${p}`), directDir, env);
     const dCost = sum(direct, (t) => t.cost);

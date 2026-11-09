@@ -32,7 +32,7 @@ Uso: totoken <comando>
   cache-clear        Esquece as reescritas guardadas
 
 Modos: auto = regras locais + reescrita com ${cfg.rewriterModel}; local = só regras locais (custo zero); off = não comprime nada novo.
-Comece um prompt com "!raw" para enviá-lo sem compressão.`;
+Comece um prompt com "raw:" para enviá-lo sem compressão.`;
 
 async function setup(cfg) {
   console.log('1/3 Ligando o proxy...');
@@ -95,6 +95,19 @@ async function main() {
         await startDaemon(cfg, SELF, { quiet });
       } catch (err) {
         if (!quiet) throw err;
+      }
+      return;
+    }
+    case 'hook': {
+      // UserPromptSubmit hook: keep the proxy up and tell it what the user typed.
+      // Anything printed here would be added to the conversation, so stay silent.
+      try {
+        const { prompt } = JSON.parse(fs.readFileSync(0, 'utf8'));
+        if (await startDaemon(cfg, SELF, { quiet: true })) {
+          await fetch(`${baseUrl(cfg)}/__totoken/prompt`, { method: 'POST', body: JSON.stringify({ prompt }), signal: AbortSignal.timeout(2000) });
+        }
+      } catch {
+        // never fail the user's prompt because of the hook
       }
       return;
     }

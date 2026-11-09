@@ -18,6 +18,7 @@ export function readSettings(file = settingsPath()) {
     if (err.code === 'ENOENT') return {};
     throw new Error(`não consegui ler ${file}: ${err.message}`);
   }
+  raw = raw.replace(/^\uFEFF/, ''); // Windows PowerShell 5 writes a BOM
   if (!raw.trim()) return {};
   let data;
   try {

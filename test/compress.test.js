@@ -1,3 +1,4 @@
+import './_home.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { compressText, cachedText } from '../src/compressor.js';

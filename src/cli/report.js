@@ -135,6 +135,7 @@ export async function doctor(cfg) {
   if (!h) bad(`o proxy não responde em ${baseUrl(cfg)}`, `rode "totoken start" e veja ${logFile()}`);
   else if (h.version !== VERSION) bad(`o proxy em execução é da versão ${h.version}`, 'rode "totoken start" para trocá-lo');
   else ok(`proxy rodando em ${baseUrl(cfg)} (modo ${h.mode})`);
+  if (h && !h.hooked) console.log('        Obs.: o hook do plugin ainda não informou nenhum prompt a este proxy. Isso é normal logo após ligar; se continuar depois de usar o Claude Code, reinstale com "totoken setup".');
 
   let pointed = false;
   try {

@@ -24,7 +24,7 @@ Você digita ──► Claude Code ──► proxy local ToToken ──► API d
 
 **Prompt caching protegido:** uma mensagem que já foi enviada é sempre reenviada exatamente igual, mesmo que você troque de modo, desligue o ToToken, atualize a versão ou reinicie o proxy. Mudar um byte do histórico faria a conversa inteira ser cobrada de novo sem cache, o que custaria muito mais do que o ToToken economiza.
 
-**O que não é tocado:** respostas de ferramentas, o histórico (que só recebe a versão já enviada antes), o prompt de sistema e as respostas do modelo.
+**Só o que você digita:** o plugin avisa o proxy de cada prompt que você envia, e o proxy comprime apenas esse texto. O que o próprio Claude Code escreve (tarefas de subagentes, resumos de conversa, títulos, corpo de comandos e skills) passa intacto, assim como respostas de ferramentas, o histórico (que só recebe a versão já enviada antes), o prompt de sistema e as respostas do modelo.
 
 ## Instalação
 
@@ -59,7 +59,7 @@ Depois de instalado, não há nada a fazer: todo prompt é comprimido sozinho.
 | `/totoken:last` | O que foi enviado de fato nos seus últimos prompts |
 | `/totoken:doctor` | Confere cada etapa e diz o que corrigir |
 | `/totoken:auto`, `/totoken:local`, `/totoken:off` | `auto`: regras + Haiku. `local`: só regras, custo zero. `off`: não comprime nada novo. Vale na hora, sem reiniciar |
-| `!raw <prompt>` | Envia aquele prompt sem compressão |
+| `raw: <prompt>` | Envia aquele prompt sem compressão |
 | skill `totoken` | Comprime um texto sob pedido ("comprima este prompt") ou liga o modo econômico ("modo totoken") |
 
 ### Skill (também no app do Claude)
@@ -98,10 +98,10 @@ Custo da reescrita: o Haiku 5.5 custa 1/40 do Opus 5.5 por token de entrada, ent
 ## Desenvolvimento
 
 ```
-npm test          # 38 testes, incluindo proxy de ponta a ponta com API simulada
+npm test          # 45 testes, incluindo proxy de ponta a ponta com API simulada
 npm run bench     # benchmark offline
 ```
 
-Estrutura: `src/protect.js` (marcadores), `src/deterministic.js` (regras locais), `src/rewriter.js` (Haiku), `src/compressor.js` (orquestra e cacheia), `src/transform.js` (corpo da requisição), `src/proxy.js` (servidor), `src/cli/` (processo em segundo plano, `settings.json` do Claude Code, relatórios e simulação), `bin/totoken.js` (entrada da CLI), `hooks/`, `commands/` e `skills/` (plugin). `test/fidelity.test.js` reúne os casos que não podem regredir: frases que só parecem enrolação, código colado e histórico estável.
+Estrutura: `src/protect.js` (marcadores), `src/deterministic.js` (regras locais), `src/rewriter.js` (Haiku), `src/compressor.js` (orquestra e cacheia), `src/transform.js` (corpo da requisição), `src/typed.js` (prompts digitados, informados pelo hook), `src/proxy.js` (servidor), `src/cli/` (processo em segundo plano, `settings.json` do Claude Code, relatórios e simulação), `bin/totoken.js` (entrada da CLI), `hooks/`, `commands/` e `skills/` (plugin). `test/fidelity.test.js` reúne os casos que não podem regredir: frases que só parecem enrolação, código colado e histórico estável.
 
 A reescrita usa HTTP direto em vez do SDK de propósito: o proxy reaproveita as credenciais exatas da requisição interceptada e o plugin roda sem `npm install`.

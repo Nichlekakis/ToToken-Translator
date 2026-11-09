@@ -10,7 +10,17 @@ function isHumanTurn(msg) {
 // - The newest human turn is compressed (and the result remembered).
 // - Earlier user turns only get what was sent for them before, so history is
 //   byte-stable between requests and prompt caching keeps hitting.
-export async function transformBody(body, { config, cache, headers, fetchImpl, compressNew = true }) {
+// `typed` (optional) is the registry of prompts the user typed. With it, only a
+// typed prompt is compressed; text written by Claude Code itself is left alone.
+function isTyped(text, body, typed) {
+  if (!typed) return true;
+  if (typed.hooked) return typed.matches(text);
+  // No hook has reported yet (plugin not installed): at least skip the tool-less
+  // side requests Claude Code makes for titles and summaries.
+  return Array.isArray(body.tools) && body.tools.length > 0;
+}
+
+export async function transformBody(body, { config, cache, headers, fetchImpl, typed, compressNew = true }) {
   if (!body || !Array.isArray(body.messages)) return { changed: false, results: [] };
   const msgs = body.messages;
   const lastIdx = msgs.findLastIndex((m) => m && m.role === 'user');
@@ -21,7 +31,7 @@ export async function transformBody(body, { config, cache, headers, fetchImpl, c
     if (!msg || msg.role !== 'user') continue;
     const fresh = compressNew && i === lastIdx && isHumanTurn(msg);
     const apply = async (text) => {
-      if (!fresh) return cachedText(text, { cache });
+      if (!fresh || !isTyped(text, body, typed)) return cachedText(text, { cache });
       const r = await compressText(text, { config, cache, headers, fetchImpl, model: body.model });
       results.push(r);
       return r.text;

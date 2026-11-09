@@ -1,13 +1,11 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-// Isolate every file the CLI touches before loading it.
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'totoken-test-'));
-process.env.TOTOKEN_HOME = path.join(tmp, 'home');
-process.env.CLAUDE_CONFIG_DIR = path.join(tmp, 'claude');
+import './_home.js';
+
+// config and settings read their paths lazily, after _home.js set them
 const { loadConfig, liveConfig, saveConfig, DEFAULTS } = await import('../src/config.js');
 const { install, uninstall, readSettings, settingsPath } = await import('../src/cli/settings.js');
 
@@ -24,8 +22,6 @@ const write = (text) => {
   fs.mkdirSync(path.dirname(settingsPath()), { recursive: true });
   fs.writeFileSync(settingsPath(), text);
 };
-
-test.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 test('install keeps the other settings and uninstall puts everything back', () => {
   write(JSON.stringify({ model: 'opus', env: { FOO: '1' } }));

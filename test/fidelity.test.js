@@ -1,5 +1,6 @@
 // Guards for the two promises of the plugin: never change what the user meant,
 // and never change a message that was already sent.
+import './_home.js';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import test from 'node:test';
@@ -64,6 +65,7 @@ test('filler is still removed where it is safe', () => {
   assert.equal(local('Bom dia! Quero que você refatore o módulo, por favor.'), 'Refatore o módulo.');
   assert.equal(local('- por favor, rode os testes\n- obrigado!'), '- rode os testes');
   assert.equal(local('Can you help me fix the login bug? Thank you!'), 'Fix the login bug?');
+  assert.equal(local('Oi! Por favor, liste os arquivos, valeu!'), 'Liste os arquivos');
 });
 
 test('new protected spans', () => {
@@ -193,7 +195,7 @@ test('mode off through the proxy still replays history and follows live config',
     proxy.close();
     upstream.close();
   });
-  const post = (messages) => fetch(`http://127.0.0.1:${proxy.address().port}/v1/messages`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages }) });
+  const post = (messages) => fetch(`http://127.0.0.1:${proxy.address().port}/v1/messages`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tools: [{ name: 'Bash' }], messages }) });
   const q1 = 'Por favor, rode os testes do projeto.';
   await post([{ role: 'user', content: q1 }]);
   config.mode = 'off';
@@ -214,4 +216,98 @@ test('large and hostile inputs are handled quickly', async () => {
   }
   assert.equal((await compressText(huge, { config: cfg({ mode: 'local' }), cache: null, record: false })).text, huge);
   assert.ok(Date.now() - started < 3000, `took ${Date.now() - started}ms`);
+});
+
+test('politeness words that are the subject of the sentence are kept', () => {
+  for (const text of [
+    'Não use obrigado como nome de variável, use thanks no campo.',
+    'A mensagem diz obrigado ao usuário; traduza valeu para thanks',
+    'Explique o que significa por favor em inglês',
+    'Oi é o nome da operadora.',
+    'Bom dia é a string esperada no output.',
+    'The word please is not allowed in the label.',
+    'Can you delete the prod database? I am asking, do not do it.',
+    'I want to know whether I need you to sign off.',
+    'corrija o teste, corrija o teste de integração também',
+    'explique x ?? y e !!flag em JS',
+    'Teste A falhou em main. Teste A falhou em main? Responda.',
+    'use a ? b : c aqui',
+  ]) {
+    assert.equal(local(text), text);
+  }
+});
+
+test('whitespace runs and long repetitive lines do not stall the proxy', () => {
+  const started = Date.now();
+  local(`a${' '.repeat(20000)}b`);
+  local(`por favor veja${' '.repeat(1900)}isto, obrigado`);
+  local('palavra outra coisa '.repeat(900));
+  local(`linha um\n${'\n'.repeat(5000)}por favor, linha dois`);
+  local('a.'.repeat(9000));
+  assert.ok(Date.now() - started < 2000, `took ${Date.now() - started}ms`);
+});
+
+test('raw: sends a prompt untouched and needs a space after it', async () => {
+  const opts = { config: cfg({ mode: 'local' }), cache: memCache(), record: false };
+  assert.equal((await compressText('raw: Por favor mantenha isto', opts)).text, 'Por favor mantenha isto');
+  assert.equal((await compressText('!rawData está quebrado no parser, por favor veja', opts)).text, '!rawData está quebrado no parser, veja');
+});
+
+test('no reply-language hint when the user already chose a language', async () => {
+  resetRewriterState();
+  const text = `${LONG_PT} Escreva a mensagem de commit em inglês.`;
+  const r = await compressText(text, { config: cfg(), cache: null, headers: { 'x-api-key': 'k' }, fetchImpl: okFetch([]), record: false });
+  assert.equal(r.method, 'llm');
+  assert.doesNotMatch(r.text, /Reply in Brazilian Portuguese/);
+});
+
+test('only prompts the user typed are compressed once the hook reports them', async () => {
+  const { TypedPrompts } = await import('../src/typed.js');
+  const config = cfg({ mode: 'local' });
+  const run = async (typed, content, extra = {}) => {
+    const body = { messages: [{ role: 'user', content }], ...extra };
+    await transformBody(body, { config, cache: memCache(), headers: null, typed });
+    return body.messages[0].content;
+  };
+  const harness = 'Please write a short title for this conversation, thanks.';
+  const mine = 'Por favor, rode os testes do projeto.';
+
+  const typed = new TypedPrompts();
+  assert.equal(await run(typed, harness), harness, 'no hook yet and no tools: a side request');
+  assert.equal(await run(typed, mine, { tools: [{ name: 'Bash' }] }), 'Rode os testes do projeto.', 'no hook yet: main-loop requests are compressed');
+
+  typed.add(mine);
+  assert.equal(await run(typed, mine), 'Rode os testes do projeto.');
+  assert.equal(await run(typed, `<context>x</context>\n${mine}`), '<context>x</context>\nRode os testes do projeto.', 'typed prompt wrapped in context');
+  assert.equal(await run(typed, harness, { tools: [{ name: 'Bash' }] }), harness, 'text the user did not type');
+});
+
+test('the hook endpoint registers a prompt and an upstream path prefix is kept', async (t) => {
+  const seen = [];
+  const upstream = http.createServer((req, res) => {
+    let d = '';
+    req.on('data', (c) => (d += c));
+    req.on('end', () => {
+      seen.push({ url: req.url, body: JSON.parse(d) });
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{}');
+    });
+  });
+  await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
+  const proxy = createProxy({ config: cfg({ mode: 'local', upstream: `http://127.0.0.1:${upstream.address().port}/gateway` }), cache: memCache() });
+  await new Promise((r) => proxy.listen(0, '127.0.0.1', r));
+  t.after(() => {
+    proxy.close();
+    upstream.close();
+  });
+  const url = `http://127.0.0.1:${proxy.address().port}`;
+  const typedPrompt = 'Por favor, rode os testes do projeto.';
+  const post = (content) => fetch(`${url}/v1/messages`, { method: 'POST', body: JSON.stringify({ messages: [{ role: 'user', content }] }) });
+  assert.equal((await fetch(`${url}/__totoken/prompt`, { method: 'POST', body: JSON.stringify({ prompt: typedPrompt }) })).status, 204);
+  assert.equal((await (await fetch(`${url}/__totoken/health`)).json()).hooked, true);
+  await post(typedPrompt);
+  await post('Por favor, resuma a conversa acima.');
+  assert.equal(seen[0].url, '/gateway/v1/messages');
+  assert.equal(seen[0].body.messages[0].content, 'Rode os testes do projeto.');
+  assert.equal(seen[1].body.messages[0].content, 'Por favor, resuma a conversa acima.');
 });
