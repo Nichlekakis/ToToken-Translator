@@ -1,3 +1,4 @@
+import './_home.js';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import test from 'node:test';
@@ -44,6 +45,7 @@ test('end to end: compresses the human turn, streams the response untouched', as
     model: 'claude-opus-5-5',
     max_tokens: 1000,
     stream: true,
+    tools: [{ name: 'Bash' }],
     messages: [{ role: 'user', content: [{ type: 'text', text: '<system-reminder>contexto</system-reminder>' }, { type: 'text', text: PROMPT }] }],
   };
   const res = await fetch(`http://127.0.0.1:${port}/v1/messages`, {
